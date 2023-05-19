@@ -34,6 +34,7 @@ header-includes:
     keywordstyle=\color{blue}
   }
   \newcommand*{\defeq}{\stackrel{\text{def}}{=}}
+  \newcommand{\beh}{\mathrm{beh}}
   %\newtheorem{theorem}{Theorem}
   %\newtheorem{lemma}{Lemma}
   \newcommand{\simplies}{\DOTSB\Longrightarrow}
@@ -125,6 +126,8 @@ $$
 
 ## Semantics: Commands
 
+- Each atomic instruction $\alpha$ has a relation $\beh(\alpha)$ (over pre- and post-states) specifying its behaviour
+
 - Program execution is defined by a small-step semantics over commands
 
 - Iteration, non-deterministic choice are dealt with at a higher level (see next slide)
@@ -142,4 +145,19 @@ $$
     - Command $c$ to be executed
     - State $\sigma$ (map from variables to values)
 
-- *Action step*
+- *Action Step*: Performed by component, changes state
+    $$
+    (c,\sigma) \xrightarrow{as} (c',\sigma') \iff \exists \alpha. c \mapsto_{\alpha} c' \,\land\, (\sigma,\sigma') \in \beh(\alpha)
+    $$ 
+
+- *Silent Step*: Performed by component, doesn't change state
+    $$
+    (c_1 \sqcap c_2, \sigma) \rightsquigarrow (c_1,\sigma) \quad (c_1 \sqcap c_2, \sigma) \rightsquigarrow (c_2,\sigma)
+    $$ 
+    $$
+    (c^{*},\sigma) \rightsquigarrow (\epsilon,\sigma) \quad (c^{*},\sigma) \rightsquigarrow (c;c^{*}, \sigma)
+    $$ 
+
+- *Program Step*: Action Step or Silent Step
+
+- *Environment Step*: Performed by environment, changes state. $(c,\sigma) \xrightarrow{es} (c,\sigma')$.
