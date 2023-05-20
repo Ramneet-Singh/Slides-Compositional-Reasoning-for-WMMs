@@ -35,10 +35,17 @@ header-includes:
   }
   \newcommand*{\defeq}{\stackrel{\text{def}}{=}}
   \newcommand{\beh}{\mathrm{beh}}
+  \newcommand{\lbeh}{\mathrm{lbeh}}
+  \newcommand{\prp}{\mathrm{prp}}
   \newcommand{\stable}{\mathrm{stable}}
   \newcommand{\vc}{\mathrm{vc}}
   \newcommand{\sat}{\mathrm{sat}}
   \newcommand{\rif}{\mathrm{rif}}
+  \newcommand{\writer}{\mathrm{writer}}
+  \newcommand{\readers}{\mathrm{readers}}
+  \newcommand{\var}{\mathrm{var}}
+  \renewcommand{\comp}{\mathrm{comp}}
+  \newcommand{\view}{\mathrm{view}}
   %\newtheorem{theorem}{Theorem}
   %\newtheorem{lemma}{Lemma}
   \newcommand{\simplies}{\DOTSB\Longrightarrow}
@@ -222,8 +229,8 @@ $$
 
 - Usual parallel rule
 $$
-\inference[Par]{\mathcal{R}, \mathcal{G} \vdash_c P \{\; c \;\} Q \quad \rif(\mathcal{R},\mathcal{G},c)}{\mathcal{R},\mathcal{G} \vdash P \{\; c \;\} Q}
-$$ 
+\inference[Par]{\mathcal{R}_1, \mathcal{G}_1 \vdash_c P_1 \{\; c_1 \;\} Q_1 \quad \mathcal{R}_2, \mathcal{G}_2 \vdash_c P_2 \{\; c_2 \;\} Q_2 \quad \mathcal{G}_2 \subseteq \mathcal{R}_1 \quad \mathcal{G}_1 \subseteq \mathcal{R}_2}{\mathcal{R}_1 \cap \mathcal{R}_2,\mathcal{G}_1 \cup \mathcal{G}_2 \vdash P_1 \land P_2 \{\; c_1~||~c_2 \;\} Q_1 \land Q_2}
+$$
 
 # Multicopy Atomic Memory Models
 
@@ -319,3 +326,123 @@ For a thread with $n$ reorderable instructions,
 $n!$ Possible Behaviours $\longrightarrow$ $n(n-1) / 2$ $\rif_a$ checks 
 
 Thanks for staying tuned : )
+
+# Non-Multicopy Atomic Memory Models
+
+- There is **no shared state** that all components agree on throughout execution, invalidating a core
+assumption of standard rely/guarantee reasoning.
+
+## Write History Semantics: Representation
+
+- Each component is associated with a unique identifier.
+
+- Shared memory state is represented as a list of variable writes $<w_1,w_2,w_3, \dots>$, with metadata to indicate which components have performed and observed particular writes.
+
+- The order of events in this write history provides an *overall order* to the system’s events, with those later in the list being the most recent.
+
+- Each $w_i = (x \mapsto v)^{wr}_{rds}$ where
+    - $x$ is a variable
+    - $v$ is a value
+    - $\writer((x \mapsto v)^{wr}_{rds}) = wr$ is the writer component's identifier
+    - $\readers((x \mapsto v)^{wr}_{rds}) = rds$ is the set of component identifiers that have observed the write
+    - $\var((x \mapsto v)^{wr}_{rds}) = x$
+
+## Write History Semantics: Manipulation
+
+- Divide instructions into two types: *global* and *local*. Global instructions $\alpha$ are:
+    - Store $(x := v)_i$, Load $[x = v]_i$, Memory barrier $\text{fence}_i$, Skip instruction (corresponding to some internal step)
+
+- Behaviour of these instructions is formalised as (for skip it's just $id$):
+\begin{align*}
+    \beh((x := v)_i) &= \{\; (h \circ h', h \circ (x \mapsto v)^i_{\{i\}} \circ h') \mid \\
+    &\forall w \in h'.\; \writer(w) \neq i \,\land\, (\var(w)=x \simplies i \not\in \readers(w)) \;\} \\
+    \beh([x = v]_i) &= \{\; (h \circ (x \mapsto v)^j_r \circ h', h \circ (x \mapsto v)^j_r \circ h') \mid \\
+    &\forall w \in h'.\; (\var(w)=x \simplies i \not\in \readers(w)) \\
+    \beh(\text{fence}_i) &= \{\; (h , h) \mid \forall w \in h.\; (i \in \readers(w) \simplies \forall y .\, y \in \readers(w)) \;\}
+\end{align*}
+
+- Propagations of writes are modelled as environment effects and can take place at any point during the execution.
+\begin{align*}
+    \prp &= \{\; (h \circ (x \mapsto v)^j_r \circ h', h \circ (x \mapsto v)^j_{r \cup \{i\}} \circ h') \mid \\
+    &i \not\in r \,\land\, \forall w \in h.\; (\var(w)=x \simplies i \in \readers(w)) \;\}
+\end{align*}
+
+## More Notation
+
+- New constructor in the language: $\comp(i,m,c)$ indicating a component with
+    - identifier $i$
+    - local state $m$
+    - command $c$
+
+- Assume a local behaviour relation $\lbeh$ such that $(m,\alpha',m') \in \lbeh(\alpha)$ if executing $\alpha$
+    - changes the local state from $m$ to $m'$
+    - corresponds to the global instruction $\alpha'$
+
+$$
+\comp(i,m,c) \mapsto_{\alpha_i'} \comp(i,m',c') \iff c \mapsto_{\alpha} c' \,\land\, (m,\alpha',m') \in \lbeh(\alpha)
+$$ 
+
+- Go from local semantics/reasoning to global semantics/reasoning using $\comp$ and $\lbeh$.
+    - Constraint: systems are constructed as the parallel composition of a series of comp commands.
+    - Trivial support for local state (e.g., hardware registers).
+
+## Meaning of Judgement
+
+- If there is no global state, what does $\mathcal{R},\mathcal{G} \vdash P \{\; c \;\} Q$ (for a component $i$ with command $c$) mean?
+
+- For a set of components $I$, write history $h$, for all variables $x$, $\view_I(h,x) = v$ iff
+$$
+h = h' \circ (x \mapsto v)^w_r \circ h'' \,\land\, I \subseteq r \,\land\, \forall w_i \in h''.\; \var(w_i)=x \simplies I \not\subseteq \readers(w_i)
+$$ 
+
+- For all executions of $c$
+    - If
+        - the execution operates on a write history $h$ such that $\view_i(h) \in P$
+        - all propagations to $i$ modify $\view_i$ in accordance with $\mathcal{R}$
+    - Then $i$ will
+        - modify $\view_i$ in accordance with $G$
+        - given termination, will end with a write history $h$ such that $\view_i(h) \in Q$
+
+- This state mapping allows for rely/guarantee judgements **over individual components** to be trivially lifted from a standard memory model to their respective views of a write history.
+
+## Parallel Composition: Taming the Beast
+
+- Parallel composition is complicated: **Need to relate differing components views**.
+
+- *If* the execution of an instruction $\alpha$ by some component $i$ satisfies its guarantee specification $G_i$ in state $h$,
+$$
+\view_i(h) \in \sat(\alpha,G_i)
+$$ 
+
+- *Then* the effects of propagating $\alpha$’s writes to some other component $j$ will satisfy its rely specification $R_j$ in its view,
+$$
+\view_j(h) \in \sat(\alpha,R_j)
+$$ 
+
+- Insight: It is possible to relate the views of two components by only considering the **difference in their observed writes**, i.e., the writes one component has observed but the other has not.
+
+## Travelling Between Components
+
+![](images/nonatomic-proof.png)
+
+- Aim to demonstrate rely/guarantee compatibility when propagating an instruction $\alpha$ from component $i$ to component $j$
+    - Given: component $i$ executes $\alpha$ such that $\view_i(h) \in \sat{\alpha,G_i}$.
+    - Step 1: Show that $\alpha$ can be executed in the shared view, i.e., $\view_{\{i,j\}}(h) \in \sat(\alpha,G_i)$.
+    - Step 2: Show that $\alpha$ can be executed in component $j$'s view, i.e., $\view_{j}(h) \in \sat{\alpha,G_i}$.
+
+- Have some relation $\epsilon$ intended to capture the possible writes $i$ may have observed ahead of $j$
+$$
+\rif_{nmca}(\epsilon, \alpha,G_i) = wp(\epsilon, \sat(\alpha,G_i)) \subseteq \sat(\alpha,G_i)
+$$ 
+
+- Proving this for $\epsilon = R_i \cap R_j \cap id_{\alpha}$ is sufficient.
+
+## Endgame
+
+- Define a compatibility relation
+
+![](images/nmca-1.png)
+
+- Modify the rules for parallel composition (note that we need separate relies and guarantees for each component because demonstrating compat requires pairwise checking)
+
+![](images/nmca-2.png)
