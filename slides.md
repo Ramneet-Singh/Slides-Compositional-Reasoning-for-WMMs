@@ -266,4 +266,56 @@ $$
 
 ## Reordering Interference Freedom
 
+- Insight: Any valid reordering will **preserve thread-local semantics**, thus may only invalidate reasoning when **observed by the environment**.
 
+    - Abstraction to the rescue again! Observed by environment $\simplies$ $\mathcal{G}$ violated, or $\mathcal{R}$ not strong enough
+
+- Three Levels: Instructions, Commands, Program
+
+## RIF: Instructions
+
+- Two instructions are *reordering interference free*: Reasoning over them in their original order is sufficient to include reordered behaviour.
+
+\begin{align*}
+\rif_a(\mathcal{R}, \mathcal{G}, \beta, \alpha) \defeq& \forall\, P,Q,M .\; \mathcal{R},\mathcal{G} \vdash_a P \{\;\beta\;\} M \,\land\, \mathcal{R},\mathcal{G} \vdash_a M \{\;\alpha\;\} Q \\
+&\simplies \exists M'.\; \mathcal{R},\mathcal{G} \vdash_a P \{\;\alpha_{<\beta>}\;\} M' \,\land\, \mathcal{R},\mathcal{G} \vdash_a M' \{\;\beta\;\} Q
+\end{align*}
+
+## RIF: Commands
+
+- Command $c$ is *reordering interference free* from $\alpha$ under $\mathcal{R},\mathcal{G}$ if the reordering of $\alpha$ over each instruction of $c$ is reordering interference free, *including those variants produced by forwarding*.
+
+\begin{align*}
+    \rif_c(\mathcal{R}, \mathcal{G}, \beta, \alpha) &\defeq \rif_a(\mathcal{R}, \mathcal{G}, \beta, \alpha) \\
+    \rif_c(\mathcal{R}, \mathcal{G}, c_1;c_2, \alpha) &\defeq \rif_c(\mathcal{R}, \mathcal{G}, c_1, \alpha_{<c_2>}) \,\land\, \rif_c(\mathcal{R}, \mathcal{G}, c_2, \alpha)
+\end{align*}
+
+## RIF: Programs
+
+- Program $c$ is *reordering interference free* if and only if **all possible reorderings** of its instructions over the respective prefixes are reordering interference free.
+
+$$
+\rif(\mathcal{R},\mathcal{G},c) \defeq \forall \alpha,r,c' .\; c \mapsto_{\alpha_{<r>}} c' \simplies \rif_c(\mathcal{R},\mathcal{G}, r, \alpha) \,\land\, \rif(\mathcal{R},\mathcal{G},c')
+$$ 
+
+- Observe: Checking $\rif(\mathcal{R},\mathcal{G},c)$ amounts to
+    - Checking $\rif_a(\mathcal{R},\mathcal{G},\beta,\alpha)$ for all pairs of instructions $\beta,\alpha$ that can reorder in $c$
+    - Including those pairs for which $\alpha$ is a new instruction generated through forwarding
+
+## Gameplan
+
+1. Compute all pairs of reorderable instructions $(\beta,\alpha)$.
+
+2. Demonstrate reordering interference freedom for as many of these pairs as possible (using $\rif_a(R, G, \beta, \alpha)$).
+
+3. If $\rif_a$ cannot be shown for some pairs
+    - introduce memory barriers to prevent their reordering or
+    - modify the verification problem such that their reordering can be considered benign
+
+4. Verify the component in isolation, using standard rely/guarantee reasoning with an assumed sequentially consistent memory model.
+
+For a thread with $n$ reorderable instructions,
+
+$n!$ Possible Behaviours $\longrightarrow$ $n(n-1) / 2$ $\rif_a$ checks 
+
+Thanks for staying tuned : )
