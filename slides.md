@@ -46,6 +46,7 @@ header-includes:
   \newcommand{\var}{\mathrm{var}}
   \renewcommand{\comp}{\mathrm{comp}}
   \newcommand{\view}{\mathrm{view}}
+  \newcommand{\compat}{\mathrm{compat}}
   %\newtheorem{theorem}{Theorem}
   %\newtheorem{lemma}{Lemma}
   \newcommand{\simplies}{\DOTSB\Longrightarrow}
@@ -75,7 +76,7 @@ $$
 
 - Judgements using earlier techniques are valid under **sequentially consistent semantics**
     - Can be directly used for data-race free code executing on weak memory models
-    - But, lots of code has data races! `seqlock`, `java.util.concurrent.ConcurrentLinkedQueue` ...
+    - But, lots of code has data races! `seqlock`, `ConcurrentLinkedQueue` in `java.util.concurrent` ...
 
 - How do we extend them to weak memory models?
 
@@ -135,6 +136,21 @@ $$
 
 - Empty program $\epsilon$ represents termination
 
+## Semantics: Commands
+
+- Each atomic instruction $\alpha$ has a relation $\beh(\alpha)$ (over pre- and post-states) specifying its behaviour
+
+- Program execution is defined by a small-step semantics over commands
+
+- Iteration, non-deterministic choice are dealt with at a higher level (see next slide)
+
+\begin{center}
+\begin{tabular}{cc}
+    \inference[]{}{\alpha \mapsto_{\alpha} \epsilon} & \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1;c_2 \mapsto_{\alpha} c_1';c_2} \\ \\
+    \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1~||~c_2 \mapsto_{\alpha} c_1'~||~c_2} & \inference[]{c_2 \mapsto_{\alpha} c_2'}{c_1~||~c_2 \mapsto_{\alpha} c_1~||~c_2'}
+\end{tabular}
+\end{center}
+
 ## Semantics: Configurations
 
 - *Configuration* $(c,\sigma)$ of a program
@@ -158,21 +174,6 @@ $$
 
 - *Environment Step*: Performed by environment, changes state. $(c,\sigma) \xrightarrow{es} (c,\sigma')$.
 
-## Semantics: Commands
-
-- Each atomic instruction $\alpha$ has a relation $\beh(\alpha)$ (over pre- and post-states) specifying its behaviour
-
-- Program execution is defined by a small-step semantics over commands
-
-- Iteration, non-deterministic choice are dealt with at a higher level (see next slide)
-
-\begin{center}
-\begin{tabular}{cc}
-    \inference[]{}{\alpha \mapsto_{\alpha} \epsilon} & \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1;c_2 \mapsto_{\alpha} c_1';c_2} \\ \\
-    \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1~||~c_2 \mapsto_{\alpha} c_1'~||~c_2} & \inference[]{c_2 \mapsto_{\alpha} c_2'}{c_1~||~c_2 \mapsto_{\alpha} c_1~||~c_2'}
-\end{tabular}
-\end{center}
-
 # Basic Proof System
 
 ## Definitions
@@ -190,7 +191,7 @@ $$
 
 - Stability of predicate $P$ under rely condition $\mathcal{R}$
 $$
-\stable_{\mathcal{R}}(P) \defeq P \subseteq \{\sigma \in P \,\mid\, \forall\, \sigma',\; (\sigma,\sigma') \in \mathcal{R} \simplies \sigma' \in P
+\stable_{\mathcal{R}}(P) \defeq P \subseteq \{\sigma \in P \,\mid\, \forall\, \sigma',\; (\sigma,\sigma') \in \mathcal{R} \simplies \sigma' \in P \}
 $$ 
 
 - Instruction $\alpha$ satisfies guarantee condition $\mathcal{G}$
@@ -203,7 +204,7 @@ $$
 ## Instruction Level ($\vdash_a$)
 
 $$
-\mathcal{R}, \mathcal{G} \vdash_a P \{\; c \;\} Q \defeq \stable_{\mathcal{R}}(P) \,\land\, \stable_{\mathcal{R}}(Q) \,\land\, \vc(\alpha) \subseteq \sat(\alpha,\mathcal{G}) \,\land\, P \{\; c \;\} Q
+\mathcal{R}, \mathcal{G} \vdash_a P \{\; \alpha \;\} Q \defeq \stable_{\mathcal{R}}(P) \,\land\, \stable_{\mathcal{R}}(Q) \,\land\, \vc(\alpha) \subseteq \sat(\alpha,\mathcal{G}) \,\land\, P \{\; \alpha \;\} Q
 $$ 
 
 - Interplay between environmental interference and pre-,post-conditions handled through stability
@@ -215,7 +216,7 @@ $$
         \inference[Atom]{\mathcal{R},\mathcal{G} \vdash_a P \{\; \alpha \;\} Q}{\mathcal{R},\mathcal{G} \vdash_c P \{\; \alpha \;\} Q} 
     \\ \\   \inference[Seq]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1 \;\} M \quad \mathcal{R},\mathcal{G} \vdash_c M \{\; c_2 \;\} Q}{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1;c_2 \;\} Q} \\ \\
         \inference[Choice]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1 \;\} Q \quad \mathcal{R},\mathcal{G} \vdash_c P \{\; c_2 \;\} Q}{\mathcal{R}, \mathcal{G} \vdash_c P \{\; c_1~\sqcap~c_2 \;\} Q}
-    \\ \\   \inference[Iteration]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} P \quad \stable_{\mathcal{R}}(P)}{\mathcal{R},\mathcal{G} \vdash_c P \{\; c^{*} \;\} Q} \\ \\
+    \\ \\   \inference[Iteration]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} P \quad \stable_{\mathcal{R}}(P)}{\mathcal{R},\mathcal{G} \vdash_c P \{\; c^{*} \;\} P} \\ \\
         \inference[Conseq]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} Q \quad P' \subseteq P \quad \mathcal{R'} \subseteq \mathcal{R} \quad Q \subseteq Q' \quad \mathcal{G} \subseteq \mathcal{G'}}{\mathcal{R'}, \mathcal{G'} \vdash_c P' \{\; c \;\} Q'}
     \end{tabular}
 \end{center}
@@ -263,7 +264,7 @@ $$
 
 - Example: $\alpha = (\texttt{y := x}), \beta = (\texttt{x := 3}), \gamma = (\texttt{z := 5})$. $\alpha_{<\beta>} = (\texttt{y := 3})$,$\alpha_{<\gamma ; \beta>} = (\texttt{y := 3})$.
     $$
-    \texttt{y := 3} < \texttt{x := 3} < \texttt{y := x} \quad \texttt{y := 3} < \texttt{z := 5 ; x := 3} < \texttt{y := x}
+    \texttt{y := 3} < \texttt{x := 3} < \texttt{y := x} \text{  and  } \texttt{y := 3} < \texttt{z := 5 ; x := 3} < \texttt{y := x}
     $$
 
 - Can execute an instruction which occurs later in the program if reordering and forwarding can bring it (in its new form $\gamma$) to the beginning
@@ -313,7 +314,7 @@ $$
 
 1. Compute all pairs of reorderable instructions $(\beta,\alpha)$.
 
-2. Demonstrate reordering interference freedom for as many of these pairs as possible (using $\rif_a(R, G, \beta, \alpha)$).
+2. Demonstrate reordering interference freedom for as many of these pairs as possible (using $\rif_a(\mathcal{R}, \mathcal{G}, \beta, \alpha)$).
 
 3. If $\rif_a$ cannot be shown for some pairs
     - introduce memory barriers to prevent their reordering or
@@ -400,8 +401,8 @@ $$
         - the execution operates on a write history $h$ such that $\view_i(h) \in P$
         - all propagations to $i$ modify $\view_i$ in accordance with $\mathcal{R}$
     - Then $i$ will
-        - modify $\view_i$ in accordance with $G$
-        - given termination, will end with a write history $h$ such that $\view_i(h) \in Q$
+        - modify $\view_i$ in accordance with $\mathcal{G}$
+        - given termination, end with a write history $h$ such that $\view_i(h) \in Q$
 
 - This state mapping allows for rely/guarantee judgements **over individual components** to be trivially lifted from a standard memory model to their respective views of a write history.
 
@@ -409,40 +410,59 @@ $$
 
 - Parallel composition is complicated: **Need to relate differing components views**.
 
-- *If* the execution of an instruction $\alpha$ by some component $i$ satisfies its guarantee specification $G_i$ in state $h$,
+- *If* the execution of an instruction $\alpha$ by some component $i$ satisfies its guarantee specification $\mathcal{G}_i$ in state $h$,
 $$
-\view_i(h) \in \sat(\alpha,G_i)
+\view_i(h) \in \sat(\alpha,\mathcal{G}_i)
 $$ 
 
-- *Then* the effects of propagating $\alpha$’s writes to some other component $j$ will satisfy its rely specification $R_j$ in its view,
+- *Then* the effects of propagating $\alpha$’s writes to some other component $j$ will satisfy its rely specification $\mathcal{R}_j$ in its view,
 $$
-\view_j(h) \in \sat(\alpha,R_j)
+\view_j(h) \in \sat(\alpha,\mathcal{R}_j)
 $$ 
 
 - Insight: It is possible to relate the views of two components by only considering the **difference in their observed writes**, i.e., the writes one component has observed but the other has not.
 
 ## Travelling Between Components
 
+\fontsize{10}{8}\selectfont
 ![](images/nonatomic-proof.png)
 
 - Aim to demonstrate rely/guarantee compatibility when propagating an instruction $\alpha$ from component $i$ to component $j$
-    - Given: component $i$ executes $\alpha$ such that $\view_i(h) \in \sat{\alpha,G_i}$.
-    - Step 1: Show that $\alpha$ can be executed in the shared view, i.e., $\view_{\{i,j\}}(h) \in \sat(\alpha,G_i)$.
-    - Step 2: Show that $\alpha$ can be executed in component $j$'s view, i.e., $\view_{j}(h) \in \sat{\alpha,G_i}$.
+    - Given: component $i$ executes $\alpha$ such that $\view_i(h) \in \sat(\alpha,\mathcal{G}_i)$.
+    - Step 1: Show that $\alpha$ can be executed in the shared view, i.e., $\view_{\{i,j\}}(h) \in \sat(\alpha,\mathcal{G}_i)$.
+    - Step 2: Show that $\alpha$ can be executed in component $j$'s view, i.e., $\view_{j}(h) \in \sat(\alpha,\mathcal{G}_i)$.
 
-- Have some relation $\epsilon$ intended to capture the possible writes $i$ may have observed ahead of $j$
+## Travelling to Shared View Through Non $i,j$ Writes
+
+- Prove step 1 by induction on length of $\Delta_{i,j}(h)$.
+    - Base case trivial ($\view_{\{i,j\}}(h) = \view_i(h)$).
+    - Induction step:
+        - The write cannot be from $j$ since $j$ hasn't observed it.
+        - If the write is from $i$, then the reordering of $\alpha$ before it has been covered in multicopy reordering interference freedom.
+        - If the write is from some $k \neq i,j$, then we do what follows.
+
+- Have some relation $\mathcal{E}$ intended to capture the possible writes $i$ may have observed ahead of $j$
 $$
-\rif_{nmca}(\epsilon, \alpha,G_i) = wp(\epsilon, \sat(\alpha,G_i)) \subseteq \sat(\alpha,G_i)
+\rif_{nmca}(\mathcal{E}, \alpha,\mathcal{G}_i) = wp(\mathcal{E}, \sat(\alpha,\mathcal{G}_i)) \subseteq \sat(\alpha,\mathcal{G}_i)
 $$ 
 
-- Proving this for $\epsilon = R_i \cap R_j \cap id_{\alpha}$ is sufficient.
+- Proving this for $\mathcal{E} = \mathcal{R}_i \cap \mathcal{R}_j \cap id_{\alpha}$ is sufficient.
 
 ## Endgame
 
-- Define a compatibility relation
-
-![](images/nmca-1.png)
+- Define a compatibility relation by universally quantifying over all writes
+\begin{align*}
+& \compat(\mathcal{G}_i, \mathcal{R}_i, \mathcal{R}_j) \defeq \forall x,v. \\
+& wp(\mathcal{R}_i \cap \mathcal{R}_j \cap id_x, \sat(\texttt{x := v}, \mathcal{G}_i)) \subseteq \sat(\texttt{x := v}, \mathcal{R}_j)
+\end{align*}
 
 - Modify the rules for parallel composition (note that we need separate relies and guarantees for each component because demonstrating compat requires pairwise checking)
-
-![](images/nmca-2.png)
+\begin{align*}
+    & \inference[Comp']{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} Q \quad \rif(\mathcal{R}, \mathcal{G}, c)}{[i \mapsto \mathcal{R}], [i \mapsto \mathcal{G}] \vdash P \{\; \comp(i,m,c) \;\} Q} \\ \\
+    & \inference[Par']{\mathcal{R}_1, \mathcal{G}_1 \vdash P_1 \{\; c_1 \;\} Q_1 \quad \mathcal{R}_2, \mathcal{G}_2 \vdash P_2 \{\; c_2 \;\} Q_2 \quad \mathrm{disjoint}(\mathcal{R}_1,\mathcal{R}_2) \\ \\ \\ \\
+    \forall i \in \mathrm{dom}(\mathcal{R}_1).\, \forall j \in \mathrm{dom}(\mathcal{R}_2) .\; \compat(\mathcal{G}_1(i), \mathcal{R}_1(i), \mathcal{R}_2(j)) \\ \\ \\ \\
+    \forall i \in \mathrm{dom}(\mathcal{R}_2).\, \forall j \in \mathrm{dom}(\mathcal{R}_1) .\; \compat(\mathcal{G}_2(i), \mathcal{R}_2(i), \mathcal{R}_1(j)) \\ \\}
+    {
+    \mathcal{R}_1 \uplus \mathcal{R}_2, \mathcal{G}_1 \uplus \mathcal{G}_2 \vdash P_1 \land P_2 \{\; c_1~||~c_2 \;\} Q_1 \land Q_2 
+    }
+\end{align*}
