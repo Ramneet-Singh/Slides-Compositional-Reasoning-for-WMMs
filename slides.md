@@ -35,6 +35,10 @@ header-includes:
   }
   \newcommand*{\defeq}{\stackrel{\text{def}}{=}}
   \newcommand{\beh}{\mathrm{beh}}
+  \newcommand{\stable}{\mathrm{stable}}
+  \newcommand{\vc}{\mathrm{vc}}
+  \newcommand{\sat}{\mathrm{sat}}
+  \newcommand{\rif}{\mathrm{rif}}
   %\newtheorem{theorem}{Theorem}
   %\newtheorem{lemma}{Lemma}
   \newcommand{\simplies}{\DOTSB\Longrightarrow}
@@ -161,3 +165,105 @@ $$
 - *Program Step*: Action Step or Silent Step
 
 - *Environment Step*: Performed by environment, changes state. $(c,\sigma) \xrightarrow{es} (c,\sigma')$.
+
+# Basic Proof System
+
+## Definitions
+
+- Associate a verification condition $\vc(\alpha)$ with each instruction $\alpha$: Provides finer-grained control (just set to $\top$ if not needed)
+
+- Hoare triple
+$$
+P \{\; \alpha \;\} Q \defeq P \subseteq \vc(\alpha) \cap \{ \sigma \,\mid\, \forall\, \sigma',\; (\sigma,\sigma') \in \beh(\alpha) \simplies \sigma' \in Q \}
+$$ 
+
+- A rely-guarantee pair $(\mathcal{R}, \mathcal{G})$ is well-formed if
+    - $\mathcal{R}$ is reflexive and transitive
+    - $\mathcal{G}$ is reflexive
+
+- Stability of predicate $P$ under rely condition $\mathcal{R}$
+$$
+\stable_{\mathcal{R}}(P) \defeq P \subseteq \{\sigma \in P \,\mid\, \forall\, \sigma',\; (\sigma,\sigma') \in \mathcal{R} \simplies \sigma' \in P
+$$ 
+
+- Instruction $\alpha$ satisfies guarantee condition $\mathcal{G}$
+$$
+\sat(\alpha,\mathcal{G}) \defeq \{ \sigma \,\mid\, \forall\, \sigma',\; (\sigma,\sigma') \in \beh(\alpha) \simplies (\sigma,\sigma') \in \mathcal{G} \}
+$$ 
+
+- Now introduce rely/guarantee judgements at three levels
+
+## Instruction Level ($\vdash_a$)
+
+$$
+\mathcal{R}, \mathcal{G} \vdash_a P \{\; c \;\} Q \defeq \stable_{\mathcal{R}}(P) \,\land\, \stable_{\mathcal{R}}(Q) \,\land\, \vc(\alpha) \subseteq \sat(\alpha,\mathcal{G}) \,\land\, P \{\; c \;\} Q
+$$ 
+
+- Interplay between environmental interference and pre-,post-conditions handled through stability
+
+## Component Level ($\vdash_c$)
+
+\begin{center}
+    \begin{tabular}{c}
+        \inference[Atom]{\mathcal{R},\mathcal{G} \vdash_a P \{\; \alpha \;\} Q}{\mathcal{R},\mathcal{G} \vdash_c P \{\; \alpha \;\} Q} 
+    \\ \\   \inference[Seq]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1 \;\} M \quad \mathcal{R},\mathcal{G} \vdash_c M \{\; c_2 \;\} Q}{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1;c_2 \;\} Q} \\ \\
+        \inference[Choice]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c_1 \;\} Q \quad \mathcal{R},\mathcal{G} \vdash_c P \{\; c_2 \;\} Q}{\mathcal{R}, \mathcal{G} \vdash_c P \{\; c_1~\sqcap~c_2 \;\} Q}
+    \\ \\   \inference[Iteration]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} P \quad \stable_{\mathcal{R}}(P)}{\mathcal{R},\mathcal{G} \vdash_c P \{\; c^{*} \;\} Q} \\ \\
+        \inference[Conseq]{\mathcal{R},\mathcal{G} \vdash_c P \{\; c \;\} Q \quad P' \subseteq P \quad \mathcal{R'} \subseteq \mathcal{R} \quad Q \subseteq Q' \quad \mathcal{G} \subseteq \mathcal{G'}}{\mathcal{R'}, \mathcal{G'} \vdash_c P' \{\; c \;\} Q'}
+    \end{tabular}
+\end{center}
+
+## Global Level ($\vdash$)
+
+- Global satisfiability needs component satisfiability + **interference check**
+$$
+\inference[Comp]{\mathcal{R}, \mathcal{G} \vdash_c P \{\; c \;\} Q \quad \rif(\mathcal{R},\mathcal{G},c)}{\mathcal{R},\mathcal{G} \vdash P \{\; c \;\} Q}
+$$ 
+
+- Usual parallel rule
+$$
+\inference[Par]{\mathcal{R}, \mathcal{G} \vdash_c P \{\; c \;\} Q \quad \rif(\mathcal{R},\mathcal{G},c)}{\mathcal{R},\mathcal{G} \vdash P \{\; c \;\} Q}
+$$ 
+
+# Multicopy Atomic Memory Models
+
+## Reordering Semantics: Basics
+
+- Multicopy atomic memory models can be characterised using a *reordering* relation $\hookleftarrow$ over pairs of instructions in a component
+
+- $\hookleftarrow$ is syntactically derivable based on the specific memory model. E.g., in ARMv8
+    - Two instructions which don't access (read or write) a common variable can be reordered
+    - Various types of memory barriers prevent reordering
+
+- *Forwarding* is another complication
+    - $\beta = \texttt{x := 3} ; \alpha = \texttt{y := x}$. Can forward the value $3$ to $y$, losing dependence between $\alpha,\beta$.
+    - `x := 3 ; y := x` $\Longrightarrow$ `y := 3 ; x := 3`
+    - Denote $\alpha$ with the value written in an earlier instruction forwarded to it as $\alpha_{<\beta>}$.
+
+- Forwarding may continue arbitrarily and can span multiple instructions
+
+## Reordering Semantics: Formal
+
+- $\alpha_{<c>}$: cumulative forwarding effects of the instructions in command $c$ on $\alpha$
+
+- Ternary relation $\gamma < c < \alpha$: Reordering of instruction $\alpha$ prior to command $c$, with cumulative forwarding effects producing $\gamma$.
+
+- Definition by induction
+\begin{align*}
+\alpha_{<\beta>} < \beta < \alpha &\defeq \beta \hookleftarrow \alpha_{<\beta>} \\
+\alpha_{<c_1;c_2>} < c_1;c_2 < \alpha &\defeq \alpha_{<c_1;c_2>} < c_1 < \alpha_{<c_2>} \,\land\, \alpha_{<c_2>} < c_2 < \alpha
+\end{align*}
+
+- Example: $\alpha = (\texttt{y := x}), \beta = (\texttt{x := 3}), \gamma = (\texttt{z := 5})$. $\alpha_{<\beta>} = (\texttt{y := 3})$,$\alpha_{<\gamma ; \beta>} = (\texttt{y := 3})$.
+    $$
+    \texttt{y := 3} < \texttt{x := 3} < \texttt{y := x} \quad \texttt{y := 3} < \texttt{z := 5 ; x := 3} < \texttt{y := x}
+    $$
+
+- Can execute an instruction which occurs later in the program if reordering and forwarding can bring it (in its new form $\gamma$) to the beginning
+$$
+\inference[Reorder]{c_2 \mapsto_{\alpha} \quad \gamma < c < \alpha}{c_1 ; c_2 \mapsto_{\gamma} c_1 ; c_2'}
+$$ 
+
+## Reordering Interference Freedom
+
+
