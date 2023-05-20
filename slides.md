@@ -135,21 +135,6 @@ $$
 
 - Empty program $\epsilon$ represents termination
 
-## Semantics: Commands
-
-- Each atomic instruction $\alpha$ has a relation $\beh(\alpha)$ (over pre- and post-states) specifying its behaviour
-
-- Program execution is defined by a small-step semantics over commands
-
-- Iteration, non-deterministic choice are dealt with at a higher level (see next slide)
-
-\begin{center}
-\begin{tabular}{cc}
-    \inference[]{}{\alpha \mapsto_{\alpha} \epsilon} & \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1;c_2 \mapsto_{\alpha} c_1';c_2} \\ \\
-    \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1~||~c_2 \mapsto_{\alpha} c_1'~||~c_2} & \inference[]{c_2 \mapsto_{\alpha} c_2'}{c_1~||~c_2 \mapsto_{\alpha} c_1~||~c_2'}
-\end{tabular}
-\end{center}
-
 ## Semantics: Configurations
 
 - *Configuration* $(c,\sigma)$ of a program
@@ -172,6 +157,21 @@ $$
 - *Program Step*: Action Step or Silent Step
 
 - *Environment Step*: Performed by environment, changes state. $(c,\sigma) \xrightarrow{es} (c,\sigma')$.
+
+## Semantics: Commands
+
+- Each atomic instruction $\alpha$ has a relation $\beh(\alpha)$ (over pre- and post-states) specifying its behaviour
+
+- Program execution is defined by a small-step semantics over commands
+
+- Iteration, non-deterministic choice are dealt with at a higher level (see next slide)
+
+\begin{center}
+\begin{tabular}{cc}
+    \inference[]{}{\alpha \mapsto_{\alpha} \epsilon} & \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1;c_2 \mapsto_{\alpha} c_1';c_2} \\ \\
+    \inference[]{c_1 \mapsto_{\alpha} c_1'}{c_1~||~c_2 \mapsto_{\alpha} c_1'~||~c_2} & \inference[]{c_2 \mapsto_{\alpha} c_2'}{c_1~||~c_2 \mapsto_{\alpha} c_1~||~c_2'}
+\end{tabular}
+\end{center}
 
 # Basic Proof System
 
